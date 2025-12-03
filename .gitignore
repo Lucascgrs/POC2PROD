@@ -1,0 +1,15 @@
+venvpoc2prod/
+__pycache__/
+.git/
+.idea/
+*.pyc
+model_finetuned_bert/
+results/
+stackoverflow_posts.csv
+*.bin
+*.pt
+*.pth
+*.safetensors
+
+# Data
+*.csv
