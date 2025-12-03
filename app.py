@@ -1,18 +1,17 @@
 import json
 import requests
-import os  # <--- AJOUTÉ
-
+import os
 import numpy as np
 import pandas as pd
 import streamlit as st
-
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
-from transformers import AutoTokenizer, AutoModel
-from transformers.modeling_outputs import SequenceClassifierOutput
+from transformers import AutoTokenizer
 from lime.lime_text import LimeTextExplainer
 from huggingface_hub import hf_hub_download
+
+# Import depuis votre fichier librairie
+from StackOverflow import BertWithExtraLayers
 
 # ==========================
 # CONFIG
@@ -30,49 +29,8 @@ st.set_page_config(
     layout="centered"
 )
 
-
-class BertWithExtraLayers(nn.Module):
-    def __init__(self, model_name, num_labels, hidden_dims=[512, 256], dropout=0.3):
-        super().__init__()
-        self.bert = AutoModel.from_pretrained(model_name)
-
-        layers = []
-        input_dim = self.bert.config.hidden_size
-
-        for hidden_dim in hidden_dims:
-            layers.extend([
-                nn.Linear(input_dim, hidden_dim),
-                nn.ReLU(),
-                nn.Dropout(dropout),
-                nn.BatchNorm1d(hidden_dim)
-            ])
-            input_dim = hidden_dim
-
-        self.extra_layers = nn.Sequential(*layers)
-        self.classifier = nn.Linear(input_dim, num_labels)
-        self.config = self.bert.config
-        self.num_labels = num_labels
-
-    def forward(self, input_ids=None, attention_mask=None, token_type_ids=None, labels=None, return_dict=None):
-        outputs = self.bert(input_ids=input_ids, attention_mask=attention_mask, token_type_ids=token_type_ids,
-                            return_dict=True)
-        pooled_output = outputs.last_hidden_state[:, 0, :]
-        x = self.extra_layers(pooled_output)
-        logits = self.classifier(x)
-
-        loss = None
-        if labels is not None:
-            loss_fct = nn.CrossEntropyLoss()
-            loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
-
-        return SequenceClassifierOutput(loss=loss, logits=logits, hidden_states=outputs.hidden_states,
-                                        attentions=outputs.attentions)
-
-
 @st.cache_resource
 def load_model_tokenizer_id2label():
-    # --- CORRECTION AVEC TOKEN ---
-
     # 1. Config
     config_path = hf_hub_download(repo_id=MODEL_ID, filename="model_config.json", token=HF_TOKEN)
     with open(config_path, "r") as f:
@@ -84,7 +42,7 @@ def load_model_tokenizer_id2label():
         raw = json.load(f)
     id2label = {int(k): v for k, v in raw.items()}
 
-    # 3. Instancier le modèle Custom
+    # 3. Instancier le modèle Custom (Classe importée de StackOverflow.py)
     model = BertWithExtraLayers(
         model_name=config_data["model_name"],
         num_labels=config_data["num_labels"],
@@ -104,17 +62,17 @@ def load_model_tokenizer_id2label():
 
     return model, tokenizer, id2label
 
-
 @st.cache_resource
 def build_lime_explainer(id2label):
     num_classes = len(id2label)
-    # id2label est {int: str}, on veut une liste ordonnée
     class_names = [str(id2label[i]) for i in range(num_classes)]
     explainer = LimeTextExplainer(class_names=class_names)
     return explainer
 
-
 def make_predict_proba_fn(model, tokenizer):
+    """
+    Fonction helper locale pour LIME qui a besoin d'un format spécifique (numpy array).
+    """
     def _predict(texts):
         if isinstance(texts, str):
             texts = [texts]
@@ -138,7 +96,6 @@ def make_predict_proba_fn(model, tokenizer):
 
     return _predict
 
-
 # ==========================
 # UI
 # ==========================
@@ -154,7 +111,6 @@ tab_pred, tab_explain = st.tabs(["🔮 Prédiction simple", "🧠 Explicabilité
 # --------------------------------------------------
 with tab_pred:
     st.subheader("Prédiction via l’API FastAPI")
-
     mode = st.radio("Mode de prédiction :", ["Top-K", "Threshold", "Batch Top-K", "Batch Threshold"], horizontal=True)
 
     if mode in ["Top-K", "Threshold"]:
@@ -164,7 +120,6 @@ with tab_pred:
 
     if mode == "Top-K":
         top_k = st.slider("Nombre de tags à prédire (k)", 1, 10, 3)
-
         if st.button("Prédire (API)", type="primary"):
             if not title_input.strip():
                 st.warning("Merci de saisir un titre.")
@@ -189,7 +144,6 @@ with tab_pred:
 
     elif mode == "Threshold":
         threshold = st.slider("Seuil de probabilité", 0.0, 1.0, 0.35, 0.01)
-
         if st.button("Prédire (API)", type="primary"):
             if not title_input.strip():
                 st.warning("Merci de saisir un titre.")
@@ -216,7 +170,6 @@ with tab_pred:
         st.subheader("Batch Prediction (Top-K)")
         top_k_batch = st.slider("Nombre de tags (k)", 1, 10, 3)
         titles_batch = st.text_area("Saisir une liste de titres (séparés par des retours à la ligne)", "")
-
         if st.button("Prédire le batch (API)", type="primary"):
             if not titles_batch.strip():
                 st.warning("Merci de saisir des titres.")
@@ -244,7 +197,6 @@ with tab_pred:
         st.subheader("Batch Prediction (Threshold)")
         threshold_batch = st.slider("Seuil de probabilité", 0.0, 1.0, 0.35, 0.01)
         titles_batch = st.text_area("Saisir une liste de titres (séparés par des retours à la ligne)", "")
-
         if st.button("Prédire le batch avec seuil (API)", type="primary"):
             if not titles_batch.strip():
                 st.warning("Merci de saisir des titres.")
@@ -261,8 +213,7 @@ with tab_pred:
                         for item in preds_list:
                             t = item['title']
                             p_list = item['predictions']
-                            tags_str = ", ".join(
-                                [f"{p['tag_id']} ({p['proba']:.2f})" for p in p_list]) if p_list else "Aucun tag"
+                            tags_str = ", ".join([f"{p['tag_id']} ({p['proba']:.2f})" for p in p_list]) if p_list else "Aucun tag"
                             data_display.append({"Titre": t, "Prédictions": tags_str})
                         st.table(pd.DataFrame(data_display))
                     else:
@@ -275,10 +226,8 @@ with tab_pred:
 # --------------------------------------------------
 with tab_explain:
     st.subheader("Explication des prédictions avec LIME")
-
     explain_title = st.text_input("✍️ Titre à expliquer :", "")
 
-    # Chargement du modèle local pour LIME
     try:
         model, tokenizer, id2label = load_model_tokenizer_id2label()
         explainer = build_lime_explainer(id2label)
@@ -296,16 +245,12 @@ with tab_explain:
         else:
             probs = predict_proba_fn([explain_title])[0]
             indices = np.argsort(probs)[::-1]
-
             top_indices = indices[:top_k_for_display]
             top_info = []
             for idx in top_indices:
                 idx = int(idx)
                 tag_name = id2label.get(idx, id2label.get(str(idx), "Unknown"))
-                top_info.append({
-                    "tag_id": tag_name,
-                    "proba": float(probs[idx])
-                })
+                top_info.append({"tag_id": tag_name, "proba": float(probs[idx])})
 
             st.markdown("### Top prédictions (modèle local)")
             df_top = pd.DataFrame(top_info)
@@ -326,7 +271,6 @@ with tab_explain:
             st.markdown(f"### Explication pour le tag : **{top_tag_name}**")
             weights = explanation.as_list(label=top_label_idx)
             df_weights = pd.DataFrame(weights, columns=["Token", "Contribution"])
-
             st.write("Les barres **vertes** indiquent les mots qui confirment ce tag.")
             st.bar_chart(df_weights.set_index("Token"))
             with st.expander("Voir les valeurs exactes"):
