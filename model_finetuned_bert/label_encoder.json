@@ -1,0 +1,24 @@
+{
+  "classes": [
+    ".net",
+    "android",
+    "asp.net",
+    "asp.net-mvc",
+    "c",
+    "c#",
+    "c++",
+    "html",
+    "iphone",
+    "java",
+    "javascript",
+    "jquery",
+    "mysql",
+    "objective-c",
+    "php",
+    "python",
+    "ruby-on-rails",
+    "sql",
+    "sql-server",
+    "wpf"
+  ]
+}

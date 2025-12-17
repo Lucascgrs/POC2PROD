@@ -3,7 +3,6 @@ __pycache__/
 .git/
 .idea/
 *.pyc
-model_finetuned_bert/
 results/
 stackoverflow_posts.csv
 *.bin
