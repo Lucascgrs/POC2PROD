@@ -50,11 +50,11 @@ LOG_HISTORY_FILE = "live_training_log.json"  # Fichier partagé pour le graphiqu
 MAX_LENGTH = 64
 TRAIN_RATIO = 0.8
 RANDOM_STATE = 42
-EPOCHS = 30
+EPOCHS = 15
 LR = 2e-5
 BATCH_SIZE = 64
 
-TOP_N_TAGS = 50
+TOP_N_TAGS = 20
 CONTINUE_TRAINING = True
 
 HIDDEN_DIMS = [512, 256]
