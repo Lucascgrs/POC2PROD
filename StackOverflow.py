@@ -37,6 +37,8 @@ from torch.optim import AdamW
 import torch.nn as nn
 from transformers.modeling_outputs import SequenceClassifierOutput
 
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
 # ===============================
 # CONFIGURATION & GLOBALS
 # ===============================
@@ -52,7 +54,7 @@ TRAIN_RATIO = 0.8
 RANDOM_STATE = 42
 EPOCHS = 30
 LR = 7e-6
-BATCH_SIZE = 16
+BATCH_SIZE = 8
 
 TOP_N_TAGS = 50
 CONTINUE_TRAINING = True
@@ -94,6 +96,12 @@ class BertWithExtraLayers(nn.Module):
         self.classifier = nn.Linear(input_dim, num_labels)
         self.config = self.bert.config
         self.num_labels = num_labels
+
+    def gradient_checkpointing_enable(self, gradient_checkpointing_kwargs=None):
+        """
+        Relaye l'activation du checkpointing au modèle Transformers sous-jacent.
+        """
+        self.bert.gradient_checkpointing_enable(gradient_checkpointing_kwargs=gradient_checkpointing_kwargs)
 
     def forward(self, input_ids=None, attention_mask=None, token_type_ids=None, labels=None, return_dict=None):
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
@@ -341,7 +349,7 @@ def train_eval_save(train_ds, val_ds, test_ds, tokenizer, encoder):
         learning_rate=LR,
         per_device_train_batch_size=BATCH_SIZE,
         per_device_eval_batch_size=BATCH_SIZE,
-        gradient_accumulation_steps=2,
+        gradient_accumulation_steps=4,
         gradient_checkpointing=True,
         num_train_epochs=EPOCHS,
         weight_decay=0.01,
