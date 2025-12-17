@@ -49,7 +49,7 @@ SAVE_DIR = "./model_finetuned_bert"
 OUTPUT_DIR = "./results"
 LOG_HISTORY_FILE = "live_training_log.json"  # Fichier partagé pour le graphique
 
-MAX_LENGTH = 128
+MAX_LENGTH = 256
 TRAIN_RATIO = 0.8
 RANDOM_STATE = 42
 EPOCHS = 30
@@ -61,7 +61,7 @@ CONTINUE_TRAINING = True
 
 HIDDEN_DIMS = [512, 256]
 DROPOUT = 0.3
-NUM_LAYERS_TO_FREEZE = 6
+NUM_LAYERS_TO_FREEZE = 3
 
 default_device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
