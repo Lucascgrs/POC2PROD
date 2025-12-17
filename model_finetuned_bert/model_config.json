@@ -1,0 +1,12 @@
+{
+  "model_name": "bert-base-uncased",
+  "num_labels": 20,
+  "hidden_dims": [
+    512,
+    256
+  ],
+  "dropout": 0.3,
+  "max_length": 64,
+  "num_layers_frozen": 6,
+  "architecture": "BertWithExtraLayers"
+}
