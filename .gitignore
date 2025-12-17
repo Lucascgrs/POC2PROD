@@ -13,3 +13,4 @@ stackoverflow_posts.csv
 
 # Data
 *.csv
+clean_repo.py
