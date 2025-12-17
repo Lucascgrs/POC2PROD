@@ -37,31 +37,29 @@ from torch.optim import AdamW
 import torch.nn as nn
 from transformers.modeling_outputs import SequenceClassifierOutput
 
-os.environ["TOKENIZERS_PARALLELISM"] = "false"
-
 # ===============================
 # CONFIGURATION & GLOBALS
 # ===============================
 
 CSV_PATH = "stackoverflow_posts.csv"
-MODEL_NAME = "microsoft/deberta-v3-large"
+MODEL_NAME = "bert-base-uncased"
 SAVE_DIR = "./model_finetuned_bert"
 OUTPUT_DIR = "./results"
 LOG_HISTORY_FILE = "live_training_log.json"  # Fichier partagé pour le graphique
 
-MAX_LENGTH = 256
+MAX_LENGTH = 64
 TRAIN_RATIO = 0.8
 RANDOM_STATE = 42
-EPOCHS = 30
-LR = 7e-6
-BATCH_SIZE = 8
+EPOCHS = 8
+LR = 2e-5
+BATCH_SIZE = 16
 
-TOP_N_TAGS = 50
+TOP_N_TAGS = 20
 CONTINUE_TRAINING = True
 
 HIDDEN_DIMS = [512, 256]
 DROPOUT = 0.3
-NUM_LAYERS_TO_FREEZE = 3
+NUM_LAYERS_TO_FREEZE = 6
 
 default_device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -88,20 +86,13 @@ class BertWithExtraLayers(nn.Module):
                 nn.Linear(input_dim, hidden_dim),
                 nn.ReLU(),
                 nn.Dropout(dropout),
-                # nn.BatchNorm1d(hidden_dim)  <-- SUPPRIMER CECI
-                nn.LayerNorm(hidden_dim)  # <-- REMPLACER PAR CECI
+                nn.BatchNorm1d(hidden_dim)
             ])
             input_dim = hidden_dim
         self.extra_layers = nn.Sequential(*layers)
         self.classifier = nn.Linear(input_dim, num_labels)
         self.config = self.bert.config
         self.num_labels = num_labels
-
-    def gradient_checkpointing_enable(self, gradient_checkpointing_kwargs=None):
-        """
-        Relaye l'activation du checkpointing au modèle Transformers sous-jacent.
-        """
-        self.bert.gradient_checkpointing_enable(gradient_checkpointing_kwargs=gradient_checkpointing_kwargs)
 
     def forward(self, input_ids=None, attention_mask=None, token_type_ids=None, labels=None, return_dict=None):
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
@@ -138,7 +129,7 @@ def keep_primary_tag(df):
 
 def clean_text(text):
     text = str(text).lower()
-    #text = re.sub(r"[^a-z\s]", " ", text)
+    text = re.sub(r"[^a-z\s]", " ", text)
     tokens = word_tokenize(text)
     if '_LEMMATIZER' in globals():
         tokens = [_LEMMATIZER.lemmatize(t) for t in tokens if len(t) > 1]
@@ -349,8 +340,6 @@ def train_eval_save(train_ds, val_ds, test_ds, tokenizer, encoder):
         learning_rate=LR,
         per_device_train_batch_size=BATCH_SIZE,
         per_device_eval_batch_size=BATCH_SIZE,
-        gradient_accumulation_steps=4,
-        gradient_checkpointing=True,
         num_train_epochs=EPOCHS,
         weight_decay=0.01,
         load_best_model_at_end=True,
