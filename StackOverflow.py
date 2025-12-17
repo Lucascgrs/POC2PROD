@@ -47,19 +47,19 @@ SAVE_DIR = "./model_finetuned_bert"
 OUTPUT_DIR = "./results"
 LOG_HISTORY_FILE = "live_training_log.json"  # Fichier partagé pour le graphique
 
-MAX_LENGTH = 64
+MAX_LENGTH = 128
 TRAIN_RATIO = 0.8
 RANDOM_STATE = 42
 EPOCHS = 30
-LR = 2e-5
-BATCH_SIZE = 64
+LR = 7e-6
+BATCH_SIZE = 16
 
-TOP_N_TAGS = 20
+TOP_N_TAGS = 50
 CONTINUE_TRAINING = True
 
 HIDDEN_DIMS = [512, 256]
 DROPOUT = 0.3
-NUM_LAYERS_TO_FREEZE = 3
+NUM_LAYERS_TO_FREEZE = 6
 
 default_device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -86,7 +86,8 @@ class BertWithExtraLayers(nn.Module):
                 nn.Linear(input_dim, hidden_dim),
                 nn.ReLU(),
                 nn.Dropout(dropout),
-                nn.BatchNorm1d(hidden_dim)
+                # nn.BatchNorm1d(hidden_dim)  <-- SUPPRIMER CECI
+                nn.LayerNorm(hidden_dim)  # <-- REMPLACER PAR CECI
             ])
             input_dim = hidden_dim
         self.extra_layers = nn.Sequential(*layers)
@@ -129,7 +130,7 @@ def keep_primary_tag(df):
 
 def clean_text(text):
     text = str(text).lower()
-    text = re.sub(r"[^a-z\s]", " ", text)
+    #text = re.sub(r"[^a-z\s]", " ", text)
     tokens = word_tokenize(text)
     if '_LEMMATIZER' in globals():
         tokens = [_LEMMATIZER.lemmatize(t) for t in tokens if len(t) > 1]
@@ -340,6 +341,8 @@ def train_eval_save(train_ds, val_ds, test_ds, tokenizer, encoder):
         learning_rate=LR,
         per_device_train_batch_size=BATCH_SIZE,
         per_device_eval_batch_size=BATCH_SIZE,
+        gradient_accumulation_steps=2,
+        gradient_checkpointing=True,
         num_train_epochs=EPOCHS,
         weight_decay=0.01,
         load_best_model_at_end=True,
